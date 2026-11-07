@@ -133,9 +133,25 @@ export const useTheme = ({
         handleSystemUIVisibility();
       }
     };
+    // Android foldables (Galaxy Fold) move the app between the cover and inner
+    // displays with a resize but no orientation change. The new display has its
+    // own cutout and status bar height, and the system can show the status bar
+    // again, so re-apply the bar state and re-read both. The screen size, not
+    // the window's, tells a display switch from the keyboard opening.
+    let screenSize = `${screen.width}x${screen.height}`;
     const handleResize = () => {
       if (isIPhoneDuo && appService?.isIOSApp && getOSPlatform() === 'ios') {
         updateDuoStatusBarRule();
+      }
+      const size = `${screen.width}x${screen.height}`;
+      if (appService?.isAndroidApp && size !== screenSize) {
+        screenSize = size;
+        handleSystemUIVisibility(true);
+        getStatusBarHeight().then((res) => {
+          if (res.height && res.height > 0) {
+            setStatusBarHeight(res.height / window.devicePixelRatio);
+          }
+        });
       }
     };
     handleResize();

@@ -24,7 +24,7 @@ vi.mock('@/hooks/useSafeAreaInsets', () => ({
   useSafeAreaInsets: () => ({ onUpdateInsets: h.onUpdateInsets }),
 }));
 vi.mock('@/utils/bridge', () => ({
-  getStatusBarHeight: vi.fn(),
+  getStatusBarHeight: vi.fn(() => Promise.resolve({ height: 0 })),
   setSystemUIVisibility: h.setSystemUIVisibility,
 }));
 vi.mock('@/utils/misc', async (importOriginal) => ({
@@ -170,6 +170,55 @@ describe('useTheme landscape status-bar rule off iPhone Duo (base behaviour)', (
     const { unmount } = renderHook(() => useTheme());
     await flush();
     expect(h.setSystemUIVisibility).toHaveBeenCalled();
+    expect(h.onUpdateInsets).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+describe('useTheme on an Android foldable', () => {
+  const setScreen = (width: number, height: number) => {
+    Object.defineProperty(window.screen, 'width', { value: width, configurable: true });
+    Object.defineProperty(window.screen, 'height', { value: height, configurable: true });
+  };
+
+  beforeEach(() => {
+    h.appService = { isMobileApp: true, isIOSApp: false, isAndroidApp: true };
+    setScreen(360, 840); // Galaxy Fold cover display
+  });
+  afterEach(() => {
+    h.appService = { isMobileApp: true, isIOSApp: true, isAndroidApp: false };
+  });
+
+  it('re-applies the status bar and re-reads the insets when the display changes', async () => {
+    const { unmount } = renderHook(() => useTheme({ systemUIVisible: false }));
+    await flush();
+    h.setSystemUIVisibility.mockClear();
+    h.onUpdateInsets.mockClear();
+
+    setScreen(884, 1000); // unfolded to the inner display
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    await flush();
+    expect(h.setSystemUIVisibility).toHaveBeenCalledWith(
+      expect.objectContaining({ visible: false }),
+    );
+    expect(h.onUpdateInsets).toHaveBeenCalled();
+    unmount();
+  });
+
+  it('does nothing when only the window resizes, as when the keyboard opens', async () => {
+    const { unmount } = renderHook(() => useTheme({ systemUIVisible: false }));
+    await flush();
+    h.setSystemUIVisibility.mockClear();
+    h.onUpdateInsets.mockClear();
+
+    setHeight(400);
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    await flush();
+    expect(h.setSystemUIVisibility).not.toHaveBeenCalled();
     expect(h.onUpdateInsets).not.toHaveBeenCalled();
     unmount();
   });
