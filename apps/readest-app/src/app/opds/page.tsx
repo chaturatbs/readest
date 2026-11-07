@@ -36,6 +36,7 @@ import {
   parseMediaType,
   parseOPDSXML,
   resolveURL,
+  attachNavigationImages,
 } from './utils/opdsUtils';
 import {
   getProxiedURL,
@@ -288,7 +289,7 @@ export default function BrowserPage() {
           } = doc;
 
           if (localName === 'feed') {
-            const feed = getFeed(doc) as OPDSFeed;
+            const feed = attachNavigationImages(doc, getFeed(doc) as OPDSFeed);
             const newState = {
               feed,
               baseURL: responseURL,

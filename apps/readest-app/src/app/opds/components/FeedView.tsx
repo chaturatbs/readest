@@ -4,7 +4,7 @@ import { useMemo, useCallback, useLayoutEffect, useRef, useState, type ReactNode
 import { VirtuosoGrid, type GridStateSnapshot, type VirtuosoGridHandle } from 'react-virtuoso';
 import { IoAdd, IoChevronBack, IoChevronForward, IoFilter } from 'react-icons/io5';
 import { useTranslation } from '@/hooks/useTranslation';
-import { OPDSFeed, OPDSGenericLink, OPDSPublication } from '@/types/opds';
+import { OPDSFeed, OPDSGenericLink, OPDSNavigationItem, OPDSPublication } from '@/types/opds';
 import { PublicationCard } from './PublicationCard';
 import { NavigationCard } from './NavigationCard';
 import { GroupCarousel } from './GroupCarousel';
@@ -26,6 +26,8 @@ interface FeedViewProps {
 const gridClassName = 'grid grid-cols-3 gap-4 px-4 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6';
 const navigationClassName =
   'grid grid-cols-2 gap-4 px-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 max-[450px]:grid-cols-1';
+
+const hasCovers = (items?: OPDSNavigationItem[]) => !!items?.some((item) => item.images?.length);
 
 // Module-scoped so the position outlives FeedView while a publication is open.
 // It is only restored onto the same entries it was saved from.
@@ -129,6 +131,19 @@ export function FeedView({
     onNavigate(url);
   };
 
+  // A navigation entry with a cover (e.g. a Kavita series) is shown as a cover
+  // tile like a publication, so a library page reads as a bookshelf.
+  const renderCoverNavigation = (item: OPDSNavigationItem, key?: number) => (
+    <PublicationCard
+      key={key}
+      publication={{ metadata: { title: item.title }, links: [], images: item.images ?? [] }}
+      baseURL={baseURL}
+      onClick={() => handleNavigationClick(item.href || '')}
+      resolveURL={resolveURL}
+      onGenerateCachedImageUrl={onGenerateCachedImageUrl}
+    />
+  );
+
   const itemContent = useCallback(
     (index: number) => (
       <PublicationCard
@@ -219,17 +234,23 @@ export function FeedView({
           {/* Navigation Items */}
           {feed.navigation && feed.navigation.length > 0 && (
             <section className='opds-navigation shrink-0 pb-6'>
-              <div className={navigationClassName}>
-                {feed.navigation.map((item, index: number) => (
-                  <NavigationCard
-                    key={index}
-                    item={item}
-                    baseURL={baseURL}
-                    onClick={handleNavigationClick}
-                    resolveURL={resolveURL}
-                  />
-                ))}
-              </div>
+              {hasCovers(feed.navigation) ? (
+                <div className={gridClassName}>
+                  {feed.navigation.map((item, index: number) => renderCoverNavigation(item, index))}
+                </div>
+              ) : (
+                <div className={navigationClassName}>
+                  {feed.navigation.map((item, index: number) => (
+                    <NavigationCard
+                      key={index}
+                      item={item}
+                      baseURL={baseURL}
+                      onClick={handleNavigationClick}
+                      resolveURL={resolveURL}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
           )}
 
@@ -271,6 +292,28 @@ export function FeedView({
               )}
 
               {group.navigation &&
+                hasCovers(group.navigation) &&
+                (useCarousel ? (
+                  <GroupCarousel
+                    count={group.navigation.length}
+                    defaultRowHeight={250}
+                    coverCentered
+                    itemContent={(itemIndex) => (
+                      <div data-carousel-item className='w-32 pr-4'>
+                        {renderCoverNavigation(group.navigation![itemIndex]!)}
+                      </div>
+                    )}
+                  />
+                ) : (
+                  <div className={`opds-navigation ${gridClassName}`}>
+                    {group.navigation.map((item, itemIndex: number) =>
+                      renderCoverNavigation(item, itemIndex),
+                    )}
+                  </div>
+                ))}
+
+              {group.navigation &&
+                !hasCovers(group.navigation) &&
                 (useCarousel ? (
                   <GroupCarousel
                     count={group.navigation.length}

@@ -1,6 +1,6 @@
 import { isOPDSCatalog } from 'foliate-js/opds.js';
 import { replace as expandURITemplate, getVariables } from 'foliate-js/uri-template.js';
-import { OPDSBaseLink, OPDSCatalog } from '@/types/opds';
+import { OPDSBaseLink, OPDSCatalog, OPDSFeed, OPDSGenericLink, REL } from '@/types/opds';
 import { EXTS } from '@/libs/document';
 import { fetchWithAuth } from './opdsReq';
 
@@ -17,6 +17,44 @@ export const groupByArray = <T, K>(arr: T[] | undefined, f: (el: T) => K | K[]):
     }
   }
   return map;
+};
+
+const IMAGE_RELS: string[] = [...REL.COVER, ...REL.THUMBNAIL];
+
+/**
+ * foliate-js turns an OPDS 1.x entry that links to a sub-catalog into a bare
+ * navigation link and drops its cover. Servers such as Kavita list every series
+ * that way, so their library pages showed as a wall of text cards. Copy each
+ * entry's cover/thumbnail links onto the navigation item built from it.
+ */
+export const attachNavigationImages = (doc: Document, feed: OPDSFeed): OPDSFeed => {
+  const imagesByHref = new Map<string, OPDSGenericLink[]>();
+  for (const entry of Array.from(doc.documentElement.children)) {
+    if (entry.localName !== 'entry') continue;
+    const links = Array.from(entry.children).filter((el) => el.localName === 'link');
+    const navLink =
+      links.find((link) => isOPDSCatalog(link.getAttribute('type') ?? '')) ?? links[0];
+    const href = navLink?.getAttribute('href');
+    if (!href) continue;
+    const images = links
+      .map((link) => ({
+        rel: link.getAttribute('rel')?.split(/ +/) ?? [],
+        href: link.getAttribute('href') ?? undefined,
+        type: link.getAttribute('type') ?? undefined,
+      }))
+      .filter((link) => link.href && link.rel.some((rel) => IMAGE_RELS.includes(rel)));
+    if (images.length) imagesByHref.set(href, images);
+  }
+  if (!imagesByHref.size) return feed;
+
+  const navigationLists = [feed.navigation, ...(feed.groups ?? []).map((g) => g.navigation)];
+  for (const list of navigationLists) {
+    for (const item of list ?? []) {
+      const images = item.href ? imagesByHref.get(item.href) : undefined;
+      if (images) item.images = images;
+    }
+  }
+  return feed;
 };
 
 export const MIME = {

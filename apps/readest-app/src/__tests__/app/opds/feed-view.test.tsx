@@ -117,3 +117,57 @@ describe('FeedView groups', () => {
     expect(onPublicationSelect).toHaveBeenCalledWith(1, 0);
   });
 });
+
+describe('FeedView navigation with covers', () => {
+  afterEach(() => cleanup());
+
+  it('shows navigation entries that carry a cover as cover tiles', () => {
+    const onNavigate = vi.fn();
+    render(
+      <FeedView
+        feed={{
+          metadata: { title: 'Fiction' },
+          links: [],
+          navigation: [
+            {
+              title: 'Piranesi',
+              href: '/series/1',
+              images: [{ rel: ['http://opds-spec.org/image'], href: '/cover/1' }],
+            },
+          ],
+        }}
+        baseURL='https://opds.example.com/opds'
+        resolveURL={(href, base) => new URL(href, base).toString()}
+        onNavigate={onNavigate}
+        onPublicationSelect={vi.fn()}
+        onGenerateCachedImageUrl={async (url) => url}
+        isOPDSCatalog={() => true}
+      />,
+    );
+
+    expect(screen.getAllByTestId('cached-image')).toHaveLength(1);
+    fireEvent.click(screen.getByText('Piranesi'));
+    expect(onNavigate).toHaveBeenCalledWith('https://opds.example.com/series/1');
+  });
+
+  it('keeps text cards for navigation entries without covers', () => {
+    render(
+      <FeedView
+        feed={{
+          metadata: { title: 'Kavita' },
+          links: [],
+          navigation: [{ title: 'On Deck', href: '/on-deck' }],
+        }}
+        baseURL='https://opds.example.com/opds'
+        resolveURL={(href, base) => new URL(href, base).toString()}
+        onNavigate={vi.fn()}
+        onPublicationSelect={vi.fn()}
+        onGenerateCachedImageUrl={async (url) => url}
+        isOPDSCatalog={() => true}
+      />,
+    );
+
+    expect(screen.getByText('On Deck')).toBeTruthy();
+    expect(screen.queryByTestId('cached-image')).toBeNull();
+  });
+});

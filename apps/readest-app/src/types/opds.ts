@@ -192,6 +192,8 @@ export interface OPDSFacetLink extends OPDSBaseLink {
 export interface OPDSNavigationItem extends OPDSGenericLink {
   title?: string;
   [SYMBOL.SUMMARY]?: string;
+  /** Cover/thumbnail links of the entry, e.g. a Kavita series (see attachNavigationImages). */
+  images?: OPDSGenericLink[];
 }
 
 export interface OPDSGroup {
